@@ -143,6 +143,9 @@ void MapSaver::writeHeader(std::ofstream& map_file) {
 	map_file << "tileset=" << map->getTileset() << std::endl;
 	map_file << "title=" << map->title << std::endl;
 	map_file << "hero_pos=" << static_cast<int>(map->hero_pos.x) << "," << static_cast<int>(map->hero_pos.y) << std::endl;
+	if (!map->respawn_override_map.empty()) {
+		map_file << "respawn=" << map->respawn_override_map << "," << static_cast<int>(map->respawn_override_point.x) << "," << static_cast<int>(map->respawn_override_point.y) << std::endl;
+	}
 
 	if (!map->procgen_chunks.empty() && !map->procgen_chunks[0].empty()) {
 		map_file << "procgen_chunks=" << map->procgen_chunks[0].size() << "," << map->procgen_chunks.size();
@@ -697,4 +700,3 @@ void MapSaver::writeEventComponents(std::ofstream &map_file, int eventID) {
 		}
 	}
 }
-

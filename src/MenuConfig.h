@@ -307,6 +307,8 @@ public:
 	WidgetLabel                * mouse_move_swap_lb;
 	WidgetCheckBox             * mouse_move_attack_cb;
 	WidgetLabel                * mouse_move_attack_lb;
+	WidgetCheckBox             * auto_aim_cb;
+	WidgetLabel                * auto_aim_lb;
 	WidgetSlider               * joystick_deadzone_sl;
 	WidgetLabel                * joystick_deadzone_lb;
 	WidgetCheckBox             * joystick_rumble_cb;
@@ -367,4 +369,3 @@ public:
 };
 
 #endif
-

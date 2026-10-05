@@ -911,6 +911,9 @@ msgstr "交换鼠标移动键"
 msgid "Attack with mouse movement"
 msgstr "用鼠标移动键攻击"
 
+msgid "Auto-aim and attack while moving"
+msgstr "移动时自动瞄准并攻击"
+
 #: ../../../src/MenuConfig.cpp:507
 msgid "Joystick Deadzone"
 msgstr "摇杆灵敏度"
@@ -1008,6 +1011,9 @@ msgid ""
 "setting is disabled, it is required to use 'Shift' to access the Power "
 "assigned to the movement button."
 msgstr "当开启‘使用鼠标移动英雄’时，这设置分配到移动键的技能是否能向敌人使用。如果这个设置被禁用，需要使用‘Shift’访问分配到移动键的技能。"
+
+msgid "When enabled, the hero automatically attacks the nearest enemy while moving and aims skills at nearby enemies."
+msgstr "开启后，角色移动时会自动攻击最近的敌人，释放技能时也会自动瞄准附近敌人。"
 
 #: ../../../src/MenuConfig.cpp:648
 msgid ""

@@ -93,6 +93,23 @@ Power::Power()
 	, untransform_on_hit(false)
 	, buff(false)
 	, buff_teleport(false)
+	, buff_backstep(0.0f)
+	, piercing_passive_id(0)
+	, elemental_passive_id(0)
+	, piercing_passive(false)
+	, piercing_passive_targets(0)
+	, elemental_passive_bonus(0.0f)
+	, double_shot_chance(0.0f)
+	, double_shot_eligible(false)
+	, basic_true_hp_percent(0.0f)
+	, basic_meteor_chance(0.0f)
+	, basic_meteor_power(0)
+	, basic_meteor_lock_target(true)
+	, basic_execute_chance(0)
+	, basic_storm_chance(0)
+	, basic_storm_power(0)
+	, basic_storm_visual_power(0)
+	, damage_current_hp_percent(0.0f)
 	, buff_party(false)
 	, wall_reflect(false)
 	, target_movement_normal(true)
@@ -920,6 +937,40 @@ void PowerManager::loadPowers() {
 			// @ATTR power.buff_teleport|bool|Power is a teleportation power.
 			power->buff_teleport = Parse::toBool(infile.val);
 		}
+		else if (infile.key == "buff_backstep") {
+			// @ATTR power.buff_backstep|float|Moves the caster backward by this many map units.
+			power->buff_backstep = Parse::toFloat(infile.val);
+		}
+		else if (infile.key == "piercing_passive_id") {
+			power->piercing_passive_id = Parse::toPowerID(infile.val);
+		}
+		else if (infile.key == "elemental_passive_id") {
+			power->elemental_passive_id = Parse::toPowerID(infile.val);
+		}
+		else if (infile.key == "piercing_passive") {
+			power->piercing_passive = Parse::toBool(infile.val);
+		}
+		else if (infile.key == "piercing_passive_targets") {
+			power->piercing_passive_targets = Parse::toInt(infile.val);
+		}
+		else if (infile.key == "elemental_passive_bonus") {
+			power->elemental_passive_bonus = Parse::toFloat(infile.val);
+		}
+		else if (infile.key == "double_shot_chance") {
+			power->double_shot_chance = Parse::toFloat(infile.val);
+		}
+		else if (infile.key == "double_shot_eligible") {
+			power->double_shot_eligible = Parse::toBool(infile.val);
+		}
+		else if (infile.key == "basic_true_hp_percent") power->basic_true_hp_percent = std::max(0.0f, std::min(100.0f, Parse::toFloat(infile.val)));
+		else if (infile.key == "basic_meteor_chance") power->basic_meteor_chance = std::max(0.0f, std::min(100.0f, Parse::toFloat(infile.val)));
+		else if (infile.key == "basic_meteor_power") power->basic_meteor_power = Parse::toPowerID(infile.val);
+		else if (infile.key == "basic_meteor_lock_target") power->basic_meteor_lock_target = Parse::toBool(infile.val);
+		else if (infile.key == "basic_execute_chance") power->basic_execute_chance = std::max(0.0f, std::min(100.0f, Parse::toFloat(infile.val)));
+		else if (infile.key == "basic_storm_chance") power->basic_storm_chance = std::max(0.0f, std::min(100.0f, Parse::toFloat(infile.val)));
+		else if (infile.key == "basic_storm_power") power->basic_storm_power = Parse::toPowerID(infile.val);
+		else if (infile.key == "basic_storm_visual_power") power->basic_storm_visual_power = Parse::toPowerID(infile.val);
+		else if (infile.key == "damage_current_hp_percent") power->damage_current_hp_percent = std::max(0.0f, std::min(100.0f, Parse::toFloat(infile.val)));
 		else if (infile.key == "buff_party") {
 			// @ATTR power.buff_party|bool|Power is cast upon party members
 			power->buff_party = Parse::toBool(infile.val);
@@ -1450,6 +1501,61 @@ void PowerManager::initHazard(PowerID power_index, StatBlock *src_stats, const F
 	// Hazard attributes based on power source
 	haz->crit_chance = src_stats->get(Stats::CRIT);
 	haz->accuracy = src_stats->get(Stats::ACCURACY);
+	// Snapshot equipped weapon effects on the projectile. The eligibility flag
+	// is shared with double shot: ranger active skills explicitly disable it.
+	haz->basic_true_hp_percent = 0;
+	haz->basic_meteor_chance = 0;
+	haz->basic_meteor_power = 0;
+	haz->basic_meteor_lock_target = true;
+	haz->basic_execute_chance = 0;
+	haz->basic_storm_chance = 0;
+	haz->basic_storm_power = 0;
+	haz->basic_storm_visual_power = 0;
+	if (src_stats->hero && haz->power->double_shot_eligible) {
+		for (size_t i = 0; i < src_stats->powers_list_items.size(); ++i) {
+			PowerID item_power = src_stats->powers_list_items[i];
+			if (!isValid(item_power)) continue;
+			Power* passive = powers[item_power];
+			if (!passive->passive) continue;
+			haz->basic_execute_chance = std::max(haz->basic_execute_chance, passive->basic_execute_chance);
+			if (isValid(passive->basic_storm_power) && passive->basic_storm_chance > haz->basic_storm_chance) {
+				haz->basic_storm_chance = passive->basic_storm_chance;
+				haz->basic_storm_power = passive->basic_storm_power;
+				haz->basic_storm_visual_power = passive->basic_storm_visual_power;
+			}
+			haz->basic_true_hp_percent = std::max(haz->basic_true_hp_percent, passive->basic_true_hp_percent);
+			if (isValid(passive->basic_meteor_power) && passive->basic_meteor_chance > haz->basic_meteor_chance) {
+				haz->basic_meteor_chance = passive->basic_meteor_chance;
+				haz->basic_meteor_power = passive->basic_meteor_power;
+				haz->basic_meteor_lock_target = passive->basic_meteor_lock_target;
+			}
+		}
+	}
+	haz->max_targets = 0;
+	int piercing_rank = 0;
+	float elemental_bonus = 0.0f;
+	for (size_t i = 0; i < src_stats->powers_passive.size(); ++i) {
+		Power* passive = powers[src_stats->powers_passive[i]];
+		if (!passive) continue;
+		if (passive->piercing_passive) piercing_rank = std::max(piercing_rank, passive->piercing_passive_targets);
+		if (passive->elemental_passive_bonus > 0.0f) elemental_bonus = std::max(elemental_bonus, passive->elemental_passive_bonus);
+	}
+	if (haz->power->piercing_passive_id > 0) {
+		haz->power->multitarget = true;
+		haz->max_targets = 1 + piercing_rank;
+	}
+	int enchanted_damage = -1;
+	if (haz->power->elemental_passive_id > 0 && elemental_bonus > 0.0f) {
+		float best_damage = 0.0f;
+		for (size_t i = 0; i < eset->damage_types.list.size(); ++i) {
+			if (!eset->damage_types.list[i].is_elemental) continue;
+			const float damage = src_stats->getDamageMax(i);
+			if (damage > best_damage) {
+				best_damage = damage;
+				enchanted_damage = static_cast<int>(i);
+			}
+		}
+	}
 
 	if (haz->power->base_damage != haz->damage.size()) {
 		for (size_t i = 0; i < haz->damage.size(); ++i) {
@@ -1459,6 +1565,16 @@ void PowerManager::initHazard(PowerID power_index, StatBlock *src_stats, const F
 					// any additional damage that matches the converted type is also added
 					haz->damage[haz->power->converted_damage].min += src_stats->getDamageMin(i);
 					haz->damage[haz->power->converted_damage].max += src_stats->getDamageMax(i);
+				}
+			}
+			else if (enchanted_damage >= 0) {
+				if (i == haz->power->base_damage) {
+					haz->damage[i].min += src_stats->getDamageMin(i);
+					haz->damage[i].max += src_stats->getDamageMax(i);
+				}
+				else if (static_cast<int>(i) == enchanted_damage) {
+					haz->damage[i].min += src_stats->getDamageMin(i) + elemental_bonus;
+					haz->damage[i].max += src_stats->getDamageMax(i) + elemental_bonus;
 				}
 			}
 			else if (i == haz->power->base_damage || (!eset->damage_types.list[haz->power->base_damage].is_elemental && eset->damage_types.list[i].is_elemental)) {
@@ -1524,6 +1640,20 @@ void PowerManager::initHazard(PowerID power_index, StatBlock *src_stats, const F
  */
 void PowerManager::buff(PowerID power_index, StatBlock *src_stats, const FPoint& origin, const FPoint& target) {
 	Power* power = powers[power_index];
+
+	// A backstep is a short, directional displacement away from the facing
+	// direction. Try progressively shorter distances so it still works near walls.
+	if (power->buff_backstep > 0.0f && collider) {
+		const int backward_direction = (static_cast<int>(src_stats->direction) + 4) % 8;
+		for (float distance = power->buff_backstep; distance >= 0.5f; distance -= 0.5f) {
+			FPoint destination = Utils::calcVector(src_stats->pos, backward_direction, distance);
+			if (collider->isValidPosition(destination.x, destination.y, src_stats->movement_type, MapCollision::COLLIDE_TYPE_ALL_ENTITIES)) {
+				src_stats->teleportation = true;
+				src_stats->teleport_destination = destination;
+				break;
+			}
+		}
+	}
 
 	// teleport to the target location
 	if (power->buff_teleport) {
@@ -2092,7 +2222,19 @@ bool PowerManager::activate(PowerID power_index, StatBlock *src_stats, const FPo
 		case Power::TYPE_FIXED:
 			return fixed(power_index, src_stats, origin, new_target);
 		case Power::TYPE_MISSILE:
-			return missile(power_index, src_stats, origin, new_target);
+		{
+			const bool success = missile(power_index, src_stats, origin, new_target);
+			if (success && power->double_shot_eligible && src_stats->hero) {
+				float chance = 0.0f;
+				for (size_t i = 0; i < src_stats->powers_passive.size(); ++i) {
+					Power* passive = powers[src_stats->powers_passive[i]];
+					if (passive) chance += passive->double_shot_chance;
+				}
+				if (chance > 0.0f && Math::percentChanceF(std::min(chance, 100.0f)))
+					missile(power_index, src_stats, origin, new_target);
+			}
+			return success;
+		}
 		case Power::TYPE_REPEATER:
 			return repeater(power_index, src_stats, origin, new_target);
 		case Power::TYPE_SPAWN:
@@ -2510,4 +2652,3 @@ PowerManager::~PowerManager() {
 		hazards.pop();
 	}
 }
-

@@ -67,11 +67,41 @@ public:
 
 	std::queue<ItemStack> drop_stack;
 
+	// Village-chief quests use campaign statuses, which are saved per character.
+	std::string villageQuestRequest(const std::string& operation, const std::string& id);
+	void notifyVillageKill(const StatBlock& enemy);
+	void notifyVillageTrial();
+	void notifyVillageTrialStart();
+	void notifyVillageTrialStage(int stage);
+	void notifyVillageDamage();
+	void notifyVillageMap(const std::string& filename);
+	void setVillageQuestion(const std::string& question);
+	const std::string& villageQuestFeedback() const { return village_feedback; }
+	std::string villageQuestSummary();
+	void villageQuestControls(std::vector<std::string>& ids, std::vector<std::string>& labels, std::vector<std::string>& operations);
+
 	float bonus_xp;		// Fractional XP points not yet awarded (e.g. killing 1 XP enemies with a +25% ring)
 
 	static const bool XP_SHOW_MSG = true;
 
 private:
+	struct VillageQuest {
+		std::string id, title, goal, type, clue, prerequisite;
+		int target, item, gold, xp, reward_item, bonus_item;
+		bool hidden;
+		VillageQuest() : target(1), item(0), gold(0), xp(0), reward_item(0), bonus_item(0), hidden(false) {}
+	};
+	std::vector<VillageQuest> village_quests;
+	bool village_quests_loaded;
+	std::string village_question;
+	std::string village_feedback;
+	bool villageVisible(const VillageQuest& quest);
+	bool villageBonusReady(const VillageQuest& quest);
+	std::string claimVillageBonus(const VillageQuest& quest);
+	void loadVillageQuests();
+	int villageProgress(const VillageQuest& quest);
+	void advanceVillageQuest(const VillageQuest& quest);
+	StatusID villageStatus(const VillageQuest& quest, const std::string& suffix);
 	StatusMap status;
 
 	std::vector<StatusID> random_status_pool;

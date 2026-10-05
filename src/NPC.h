@@ -117,6 +117,7 @@ public:
 	Sprite* hero_portrait;
 	std::vector<Sprite*> portraits;
 	bool talker;
+	bool ai_chat;
 
 	// vendor info
 	bool vendor;

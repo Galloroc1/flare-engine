@@ -56,6 +56,7 @@ FLARE.  If not, see http://www.gnu.org/licenses/
 MenuInventory::MenuInventory()
 	: button_close(new WidgetButton(WidgetButton::CLOSE_FILE))
 	, button_sort(NULL)
+	, button_sell_gear(NULL)
 	, equipmentSetPrevious(NULL)
 	, equipmentSetNext(NULL)
 	, equipmentSetLabel(NULL)
@@ -265,6 +266,12 @@ MenuInventory::MenuInventory()
 		}
 	}
 
+	button_sell_gear = new WidgetButton(WidgetButton::DEFAULT_FILE);
+	button_sell_gear->setBasePos(220, 772, Utils::ALIGN_TOPLEFT);
+	button_sell_gear->setLabel(msg->get("Sell all carried gear"));
+	button_sell_gear->tooltip = msg->get("Sell unequipped equipment in the backpack. Quest items and items without a price are kept.");
+	tablist.add(button_sell_gear);
+
 	align();
 }
 
@@ -302,6 +309,7 @@ void MenuInventory::align() {
 
 	if (button_sort)
 		button_sort->setPos(window_area.x, window_area.y);
+	button_sell_gear->setPos(window_area.x, window_area.y);
 }
 
 void MenuInventory::logic() {
@@ -404,6 +412,9 @@ void MenuInventory::logic() {
 		if (button_sort && button_sort->checkClick()) {
 			inventory[CARRIED].sortNext();
 		}
+		if (button_sell_gear->checkClick()) {
+			sellAllCarriedGear();
+		}
 	}
 
 	if (max_equipment_set > 0 && !menu->pause) {
@@ -462,6 +473,40 @@ void MenuInventory::render() {
 
 	if (button_sort)
 		button_sort->render();
+	button_sell_gear->render();
+}
+
+void MenuInventory::sellAllCarriedGear() {
+	int sold_stacks = 0;
+	int total = 0;
+	for (int i = 0; i < MAX_CARRIED; ++i) {
+		ItemStack stack = inventory[CARRIED][i];
+		if (stack.empty() || !items->isValid(stack.item) || stack.item == eset->misc.currency_id)
+			continue;
+		Item* item = items->items[stack.item];
+		if (item->quest_item || item->getPrice(ItemManager::USE_VENDOR_RATIO) == 0)
+			continue;
+		bool is_equipment = false;
+		for (size_t slot = 0; slot < slot_type.size(); ++slot) {
+			if (item->type == slot_type[slot]) {
+				is_equipment = true;
+				break;
+			}
+		}
+		if (!is_equipment)
+			continue;
+		total += item->getSellPrice(ItemManager::DEFAULT_SELL_PRICE) * stack.quantity;
+		inventory[CARRIED].subtract(i, stack.quantity);
+		++sold_stacks;
+	}
+	if (sold_stacks > 0) {
+		addCurrency(total);
+		items->playSound(eset->misc.currency_id);
+		pc->logMsg(msg->getv("Sold %d equipment stacks for %d %s.", sold_stacks, total, eset->loot.currency.c_str()), Avatar::MSG_NORMAL);
+	}
+	else {
+		pc->logMsg(msg->get("No sellable equipment in the backpack."), Avatar::MSG_NORMAL);
+	}
 }
 
 int MenuInventory::areaOver(const Point& position) {
@@ -1401,6 +1446,12 @@ void MenuInventory::applyItemSetBonuses(std::vector<ItemSetID> &active_sets, std
 }
 
 void MenuInventory::applyBonus(const BonusData* bdata) {
+	if (bdata->type == BonusData::ITEM_POWER) {
+		if (powers->isValid(bdata->power_id) && powers->powers[bdata->power_id]->passive &&
+			std::find(pc->stats.powers_list_items.begin(), pc->stats.powers_list_items.end(), bdata->power_id) == pc->stats.powers_list_items.end())
+			pc->stats.powers_list_items.push_back(bdata->power_id);
+		return;
+	}
 	EffectDef ed;
 
 	if (bdata->type == BonusData::SPEED) {
@@ -1783,6 +1834,7 @@ bool MenuInventory::equipmentContain(ItemID item, int quantity) {
 MenuInventory::~MenuInventory() {
 	delete button_close;
 	delete button_sort;
+	delete button_sell_gear;
 	for (size_t i=0; i<equipmentSetButton.size(); i++) {
 		delete equipmentSetButton[i];
 	}

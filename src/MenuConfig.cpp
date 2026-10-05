@@ -214,6 +214,8 @@ MenuConfig::MenuConfig (bool _is_game_state)
 	, mouse_move_swap_lb(new WidgetLabel())
 	, mouse_move_attack_cb(new WidgetCheckBox(WidgetCheckBox::DEFAULT_FILE))
 	, mouse_move_attack_lb(new WidgetLabel())
+	, auto_aim_cb(new WidgetCheckBox(WidgetCheckBox::DEFAULT_FILE))
+	, auto_aim_lb(new WidgetLabel())
 	, joystick_deadzone_sl(new WidgetSlider(WidgetSlider::DEFAULT_FILE))
 	, joystick_deadzone_lb(new WidgetLabel())
 	, joystick_rumble_cb(new WidgetCheckBox(WidgetCheckBox::DEFAULT_FILE))
@@ -519,6 +521,7 @@ void MenuConfig::init() {
 	cfg_tabs[INPUT_TAB].setOptionWidgets(Platform::Input::NO_MOUSE, no_mouse_lb, no_mouse_cb, msg->get("Do not use mouse"));
 	cfg_tabs[INPUT_TAB].setOptionWidgets(Platform::Input::MOUSE_MOVE_SWAP, mouse_move_swap_lb, mouse_move_swap_cb, msg->get("Swap mouse movement button"));
 	cfg_tabs[INPUT_TAB].setOptionWidgets(Platform::Input::MOUSE_MOVE_ATTACK, mouse_move_attack_lb, mouse_move_attack_cb, msg->get("Attack with mouse movement"));
+	cfg_tabs[INPUT_TAB].setOptionWidgets(Platform::Input::AUTO_AIM, auto_aim_lb, auto_aim_cb, msg->get("Auto-aim and attack while moving"));
 	cfg_tabs[INPUT_TAB].setOptionWidgets(Platform::Input::JOYSTICK_DEADZONE, joystick_deadzone_lb, joystick_deadzone_sl, msg->get("Joystick Deadzone"));
 	cfg_tabs[INPUT_TAB].setOptionWidgets(Platform::Input::JOYSTICK_RUMBLE, joystick_rumble_lb, joystick_rumble_cb, msg->get("Joystick Rumble"));
 	cfg_tabs[INPUT_TAB].setOptionWidgets(Platform::Input::TOUCH_CONTROLS, touch_controls_lb, touch_controls_cb, msg->get("Touch Controls"));
@@ -660,6 +663,7 @@ void MenuConfig::readConfig() {
 	no_mouse_cb->tooltip = msg->get("This allows the game to be controlled entirely with the keyboard (or joystick).");
 	mouse_move_swap_cb->tooltip = msg->get("When 'Move hero using mouse' is enabled, this setting controls if 'Main1' or 'Main2' is used to move the hero. If enabled, 'Main2' will move the hero instead of 'Main1'.");
 	mouse_move_attack_cb->tooltip = msg->get("When 'Move hero using mouse' is enabled, this setting controls if the Power assigned to the movement button can be used by targeting an enemy. If this setting is disabled, it is required to use 'Shift' to access the Power assigned to the movement button.");
+	auto_aim_cb->tooltip = msg->get("When enabled, the hero automatically attacks the nearest enemy while moving and aims skills at nearby enemies.");
 	mouse_aim_cb->tooltip = msg->get("The player's attacks will be aimed in the direction of the mouse cursor when this is enabled.");
 	touch_controls_cb->tooltip = msg->get("When enabled, a virtual gamepad will be added in-game. Other interactions, such as drag-and-drop behavior, are also altered to better suit touch input.");
 
@@ -1063,6 +1067,7 @@ void MenuConfig::updateInput() {
 		mouse_move_swap_cb->setChecked(settings->mouse_move_swap);
 		mouse_move_attack_cb->setChecked(settings->mouse_move_attack);
 	}
+	auto_aim_cb->setChecked(settings->auto_aim);
 	joystick_rumble_cb->setChecked(settings->joystick_rumble);
 	touch_controls_cb->setChecked(settings->touchscreen);
 
@@ -1487,6 +1492,9 @@ void MenuConfig::logicInput() {
 	}
 	else if (cfg_tabs[INPUT_TAB].options[Platform::Input::MOUSE_MOVE_ATTACK].enabled && mouse_move_attack_cb->checkClickAt(mouse.x, mouse.y)) {
 		settings->mouse_move_attack = mouse_move_attack_cb->isChecked();
+	}
+	else if (cfg_tabs[INPUT_TAB].options[Platform::Input::AUTO_AIM].enabled && auto_aim_cb->checkClickAt(mouse.x, mouse.y)) {
+		settings->auto_aim = auto_aim_cb->isChecked();
 	}
 	else if (cfg_tabs[INPUT_TAB].options[Platform::Input::JOYSTICK_DEADZONE].enabled && joystick_deadzone_sl->checkClickAt(mouse.x, mouse.y)) {
 		settings->joy_deadzone = joystick_deadzone_sl->getValue();
@@ -2117,4 +2125,3 @@ bool MenuConfig::setFrameLimit() {
 	}
 	return false;
 }
-

@@ -40,6 +40,7 @@ public:
 	unsigned hotkey;
 	bool instant_item;
 	bool activated_from_inventory;
+	bool auto_attack;
 	FPoint target;
 
 	ActionData()
@@ -47,6 +48,7 @@ public:
 		, hotkey(0)
 		, instant_item(false)
 		, activated_from_inventory(false)
+		, auto_attack(false)
 		, target(FPoint()) {
 	}
 };
@@ -102,6 +104,7 @@ private:
 	std::vector<PowerID> power_cooldown_ids;
 
 public:
+	bool isAutoAttacking() const { return current_power_is_auto_attack; }
 	enum {
 		MSG_NORMAL = 0,
 		MSG_UNIQUE = 1
@@ -154,6 +157,7 @@ public:
 	// vars
 	PowerID current_power;
 	PowerID current_power_original;
+	bool current_power_is_auto_attack;
 	FPoint act_target;
 	bool drag_walking;
 	bool newLevelNotification;
@@ -180,4 +184,3 @@ public:
 };
 
 #endif
-

@@ -53,6 +53,10 @@ FLARE.  If not, see http://www.gnu.org/licenses/
 
 #include <climits>
 
+static bool isLegacyRangerPower(PowerID id) {
+	return (id >= 45 && id <= 115) || (id >= 209 && id <= 233) || (id >= 310 && id <= 360);
+}
+
 MenuPowersCell::MenuPowersCell()
 	: id(0)
 	, requires_point(false)
@@ -130,6 +134,10 @@ MenuPowers::MenuPowers()
 {
 
 	closeButton = new WidgetButton(WidgetButton::CLOSE_FILE);
+	resetButton = new WidgetButton(WidgetButton::DEFAULT_FILE);
+	resetButton->setLabel(msg->get("Reset Skill Points"));
+	resetButton->tooltip = msg->get("Refund spent skill points and reset learned powers.");
+	reset_button_pos = Point(430, 775);
 
 	// Read powers data from config file
 	FileParser infile;
@@ -150,6 +158,8 @@ MenuPowers::MenuPowers()
 			// @ATTR close|point|Position of the close button.
 			else if (infile.key == "close")
 				close_pos = Parse::toPoint(infile.val);
+			else if (infile.key == "reset_button")
+				reset_button_pos = Parse::toPoint(infile.val);
 
 			// @ATTR tab_area|rectangle|Position and dimensions of the tree pages.
 			else if (infile.key == "tab_area")
@@ -198,6 +208,7 @@ MenuPowers::~MenuPowers() {
 	}
 
 	delete closeButton;
+	delete resetButton;
 	if (tab_control) delete tab_control;
 	menu_powers = NULL;
 
@@ -213,6 +224,7 @@ void MenuPowers::align() {
 
 	closeButton->pos.x = window_area.x+close_pos.x;
 	closeButton->pos.y = window_area.y+close_pos.y;
+	resetButton->setPos(window_area.x + reset_button_pos.x, window_area.y + reset_button_pos.y);
 
 	if (tab_control) {
 		tab_control->setMainArea(window_area.x + tab_area.x, window_area.y + tab_area.y, tab_area.w);
@@ -370,6 +382,29 @@ void MenuPowers::loadPowerTree(const std::string &filename) {
 				power_cell[i].upgrade_button->setBasePos(power_cell[i].pos.x + upgrade_button_offset.x, power_cell[i].pos.y + upgrade_button_offset.y, Utils::ALIGN_TOPLEFT);
 			}
 		}
+	}
+
+	// Scout characters can have old ranger skills stored in their save file.
+	// Keep the basic ranged attack, but retire the previous ranger skill set.
+	if (pc->stats.character_class == "Scout") {
+		for (size_t i = pc->stats.powers_passive.size(); i > 0; --i) {
+			PowerID id = pc->stats.powers_passive[i - 1];
+			if (isLegacyRangerPower(id)) {
+				pc->stats.effects.removeEffectPassive(id);
+				pc->stats.powers_passive.erase(pc->stats.powers_passive.begin() + static_cast<std::ptrdiff_t>(i - 1));
+			}
+		}
+		for (size_t i = pc->stats.powers_list.size(); i > 0; --i) {
+			if (isLegacyRangerPower(pc->stats.powers_list[i - 1]))
+				pc->stats.powers_list.erase(pc->stats.powers_list.begin() + static_cast<std::ptrdiff_t>(i - 1));
+		}
+		for (size_t i = 0; i < menu->act->hotkeys.size(); ++i) {
+			if (isLegacyRangerPower(menu->act->hotkeys[i]) || isLegacyRangerPower(menu->act->hotkeys_mod[i]))
+				menu->act->clearSlot(i);
+		}
+		pc->stats.check_title = true;
+		pc->stats.refresh_stats = true;
+		menu->act->updated = true;
 	}
 
 	setUnlockedPowers();
@@ -1489,6 +1524,7 @@ void MenuPowers::logic() {
 	if (points_left > 0) {
 		newPowerNotification = true;
 	}
+	resetButton->enabled = getPointsUsed() > 0;
 
 	for (size_t i=0; i<power_cell.size(); i++) {
 		// make sure invisible cells are skipped in the tablist
@@ -1525,6 +1561,9 @@ void MenuPowers::logic() {
 			}
 		}
 	}
+
+	if (visible && pc->stats.hp > 0 && resetButton->checkClick())
+		resetSkillPoints();
 
 	if (!visible) return;
 
@@ -1620,6 +1659,7 @@ void MenuPowers::render() {
 
 	// close button
 	closeButton->render();
+	resetButton->render();
 
 	// text overlay
 	label_powers->render();
@@ -1769,6 +1809,45 @@ void MenuPowers::resetToBasePowers() {
 	setUnlockedPowers();
 }
 
+void MenuPowers::resetSkillPoints() {
+	std::vector<PowerID> refunded_powers;
+
+	for (size_t i = 0; i < power_cell.size(); ++i) {
+		MenuPowersCellGroup& group = power_cell[i];
+		PowerID current_id = group.getCurrent()->id;
+		PowerID base_id = group.cells.front().id;
+		if (current_id != base_id)
+			menu->act->addPower(base_id, current_id);
+
+		for (size_t j = 0; j < group.cells.size(); ++j) {
+			MenuPowersCell& cell = group.cells[j];
+			if (cell.requires_point) {
+				refunded_powers.push_back(cell.id);
+				pc->stats.powers_list.erase(std::remove(pc->stats.powers_list.begin(), pc->stats.powers_list.end(), cell.id), pc->stats.powers_list.end());
+				pc->stats.powers_passive.erase(std::remove(pc->stats.powers_passive.begin(), pc->stats.powers_passive.end(), cell.id), pc->stats.powers_passive.end());
+				pc->stats.effects.removeEffectPassive(cell.id);
+			}
+			cell.is_unlocked = false;
+			cell.passive_on = false;
+		}
+		group.current_cell = 0;
+	}
+
+	for (size_t i = 0; i < menu->act->hotkeys.size(); ++i) {
+		if (std::find(refunded_powers.begin(), refunded_powers.end(), menu->act->hotkeys[i]) != refunded_powers.end() ||
+			std::find(refunded_powers.begin(), refunded_powers.end(), menu->act->hotkeys_mod[i]) != refunded_powers.end()) {
+			menu->act->clearSlot(i);
+		}
+	}
+
+	pc->stats.check_title = true;
+	pc->stats.refresh_stats = true;
+	menu->inv->applyEquipment();
+	setUnlockedPowers();
+	menu->act->updated = true;
+	newPowerNotification = false;
+}
+
 /**
  * Return true if required stats for power usage are met. Else return false.
  */
@@ -1900,4 +1979,3 @@ void MenuPowers::defocusTabLists() {
 		}
 	}
 }
-

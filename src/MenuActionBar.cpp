@@ -28,6 +28,8 @@ FLARE.  If not, see http://www.gnu.org/licenses/
 #include "Avatar.h"
 #include "CommonIncludes.h"
 #include "EngineSettings.h"
+#include "Entity.h"
+#include "EntityManager.h"
 #include "FileParser.h"
 #include "FontEngine.h"
 #include "InputState.h"
@@ -321,6 +323,7 @@ void MenuActionBar::loadGraphics() {
 }
 
 void MenuActionBar::logic() {
+	auto_attack_cooldown.tick();
 	tablist.logic();
 	if (tablist.getCurrent() != -1) {
 		tablist_cursor = tablist.getCurrent();
@@ -574,6 +577,10 @@ void MenuActionBar::checkAction(std::vector<ActionData> &action_queue) {
 	bool enable_main2 = !settings->mouse_move_swap || enable_mm_attack;
 
 	unsigned mm_slot = settings->mouse_move_swap ? 11 : 10;
+	bool movement_button_held = settings->mouse_move && inpt->pressing[settings->mouse_move_swap ? Input::MAIN2 : Input::MAIN1];
+	bool attack_button_held = settings->mouse_move
+		? inpt->pressing[settings->mouse_move_swap ? Input::MAIN1 : Input::MAIN2]
+		: (inpt->pressing[Input::MAIN1] || inpt->pressing[Input::MAIN2]);
 	bool mouse_move_target = false;
 	if (settings->mouse_move) {
 		mouse_move_target = pc->mm_target_object == Avatar::MM_TARGET_ENTITY &&
@@ -593,6 +600,7 @@ void MenuActionBar::checkAction(std::vector<ActionData> &action_queue) {
 		ActionData action;
 		action.hotkey = i;
 		bool have_aim = false;
+		const Entity* auto_attack_target = NULL;
 		slot_activated[i] = false;
 
 		if (!slots[i]) continue;
@@ -663,6 +671,42 @@ void MenuActionBar::checkAction(std::vector<ActionData> &action_queue) {
 			twostep_slot = -1;
 		}
 
+		// A skill pressed this frame always wins over movement-triggered attacks.
+		// Skill slots are visited before the primary attack slot, so queued manual
+		// actions can be detected here without delaying the skill by one frame.
+		bool manual_power_queued = false;
+		for (size_t j = 0; j < action_queue.size(); ++j) {
+			if (!action_queue[j].auto_attack && !action_queue[j].activated_from_inventory && action_queue[j].power > 0) {
+				manual_power_queued = true;
+				break;
+			}
+		}
+
+		// The primary attack fires automatically when an enemy is in range.
+		// Shift pauses auto attack so the mouse can be used for precise aiming.
+		if (settings->auto_aim && !manual_power_queued && i == SLOT_MAIN1 && action.power == 0 && auto_attack_cooldown.isEnd() && twostep_slot == -1 && !menu->menus_open && pc->stats.alive && !inpt->pressing[Input::SHIFT] &&
+			(!attack_button_held || movement_button_held) &&
+			(hotkeys[i] == 1 || hotkeys[i] == 42 || hotkeys[i] == 116) && powers->isValid(hotkeys_mod[i])) {
+			const Power* basic_attack = powers->powers[hotkeys_mod[i]];
+			float nearest_distance = 12.f;
+			for (size_t j = 0; j < entitym->entities.size(); ++j) {
+				const Entity* candidate = entitym->entities[j];
+				if (!candidate->stats.alive || candidate->stats.hp <= 0 || candidate->stats.hero_ally)
+					continue;
+				float distance = Utils::calcDist(pc->stats.pos, candidate->stats.pos);
+				if (distance < nearest_distance && powers->checkCombatRange(hotkeys_mod[i], &pc->stats, candidate->stats.pos) &&
+					mapr->collider.lineOfSight(pc->stats.pos.x, pc->stats.pos.y, candidate->stats.pos.x, candidate->stats.pos.y)) {
+					auto_attack_target = candidate;
+					nearest_distance = distance;
+				}
+			}
+			if (auto_attack_target && !basic_attack->buff && !basic_attack->no_attack) {
+				action.power = hotkeys_mod[i];
+				action.auto_attack = true;
+				have_aim = true;
+			}
+		}
+
 		// a power slot was activated
 		if (powers->isValid(action.power)) {
 			const Power* power = powers->powers[action.power];
@@ -698,7 +742,10 @@ void MenuActionBar::checkAction(std::vector<ActionData> &action_queue) {
 			}
 
 			// set the target depending on how the power was triggered
-			if (have_aim && settings->mouse_aim && (settings->mouse_move || !inpt->usingTouchscreen())) {
+			if (auto_attack_target) {
+				action.target = auto_attack_target->stats.pos;
+			}
+			else if (have_aim && settings->mouse_aim && (settings->mouse_move || !inpt->usingTouchscreen())) {
 				action.target = pc->stats.pos;
 
 				if (power->target_nearest > 0) {
@@ -712,6 +759,28 @@ void MenuActionBar::checkAction(std::vector<ActionData> &action_queue) {
 				else if (mouse_move_target) {
 					action.target = pc->mm_target_object_pos;
 				}
+				else if (settings->auto_aim && !inpt->pressing[Input::SHIFT] && !power->buff && !power->no_attack && !power->requires_corpse && !power->requires_empty_target) {
+					// Mouse attacks lock onto the closest visible enemy near the hero.
+					// Holding Shift retains precise cursor aiming for skills that need it.
+					float max_distance = power->target_range > 8.f ? power->target_range : 8.f;
+					if (max_distance > 12.f) max_distance = 12.f;
+					float nearest_distance = max_distance;
+					const Entity* nearest = NULL;
+					for (size_t j = 0; j < entitym->entities.size(); ++j) {
+						const Entity* candidate = entitym->entities[j];
+						if (!candidate->stats.alive || candidate->stats.hp <= 0 || candidate->stats.hero_ally)
+							continue;
+						float distance = Utils::calcDist(pc->stats.pos, candidate->stats.pos);
+						if (distance < nearest_distance && mapr->collider.lineOfSight(pc->stats.pos.x, pc->stats.pos.y, candidate->stats.pos.x, candidate->stats.pos.y)) {
+							nearest = candidate;
+							nearest_distance = distance;
+						}
+					}
+					if (nearest)
+						action.target = nearest->stats.pos;
+					else
+						action.target = Utils::calcVector(pc->stats.pos, pc->stats.direction, pc->stats.melee_range);
+				}
 				else {
 					if (power->aim_assist)
 						action.target = Utils::screenToMap(inpt->mouse.x,  inpt->mouse.y + eset->misc.aim_assist, mapr->cam.pos.x, mapr->cam.pos.y);
@@ -723,12 +792,20 @@ void MenuActionBar::checkAction(std::vector<ActionData> &action_queue) {
 				action.target = Utils::calcVector(pc->stats.pos, pc->stats.direction, pc->stats.melee_range);
 			}
 
+			bool interrupts_auto_attack = pc->isAutoAttacking() && !action.auto_attack && !action.activated_from_inventory;
 			bool can_use_power = slots[i]->enabled &&
-				(power->new_state == Power::STATE_INSTANT || (pc->stats.cooldown.isEnd() && pc->stats.cur_state != StatBlock::ENTITY_POWER && pc->stats.cur_state != StatBlock::ENTITY_HIT)) &&
+				(power->new_state == Power::STATE_INSTANT || interrupts_auto_attack || (pc->stats.cooldown.isEnd() && pc->stats.cur_state != StatBlock::ENTITY_POWER && pc->stats.cur_state != StatBlock::ENTITY_HIT)) &&
 				powers->hasValidTarget(action.power, &pc->stats, action.target);
 
 			// add it to the queue
 			if (can_use_power) {
+				if (i == SLOT_MAIN1 && auto_attack_target) {
+					// Keep movement-triggered basic attacks readable instead of
+					// restarting short attack animations as soon as they finish.
+					const unsigned delay_frames = std::max(1u,
+						static_cast<unsigned>(settings->max_frames_per_sec * 450 / 1000));
+					auto_attack_cooldown.setDuration(delay_frames);
+				}
 				if (i != mm_slot && !action.instant_item) {
 					pc->mm_target_object = Avatar::MM_TARGET_NONE;
 				}

@@ -127,6 +127,7 @@ private:
 	MenuPowersCell* getCellByPowerIndex(PowerID power_index);
 
 	void upgradePower(MenuPowersCell* pcell, bool ignore_tab);
+	void resetSkillPoints();
 
 	int getPointsUsed();
 
@@ -139,8 +140,10 @@ private:
 
 	std::vector<Sprite *> tree_surf;
 	WidgetButton *closeButton;
+	WidgetButton *resetButton;
 
 	Point close_pos;
+	Point reset_button_pos;
 	Rect tab_area;
 
 	int points_left;

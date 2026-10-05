@@ -68,7 +68,7 @@ Settings::Settings()
 	, soft_reset(false)
 	, safe_video(false)
 {
-	config.resize(55);
+	config.resize(56);
 	setConfigDefault(0,  "fullscreen",          &typeid(fullscreen),          "1",             &fullscreen,          "Fullscreen mode | 0 = disable, 1 = enable");
 	setConfigDefault(1,  "resolution_w",        &typeid(screen_w),            "640",           &screen_w,            "Window size");
 	setConfigDefault(2,  "resolution_h",        &typeid(screen_h),            "480",           &screen_h,            "");
@@ -124,6 +124,7 @@ Settings::Settings()
 	setConfigDefault(52, "fade_walls",          &typeid(fade_walls),          "1",             &fade_walls,          "Lowers the opacity of walls that are covering the player. 0 = disable, 1 = enable");
 	setConfigDefault(53, "setup_language",      &typeid(setup_language),      "0",             &setup_language,      "(First-time-launch setup) Language | 0 = show dialog, 1 = no dialog");
 	setConfigDefault(54, "setup_mousemove",     &typeid(setup_mousemove),     "0",             &setup_mousemove,     "(First-time-launch setup) Mouse movement | 0 = show dialog, 1 = no dialog");
+	setConfigDefault(55, "auto_aim",            &typeid(auto_aim),            "1",             &auto_aim,            "Automatically target nearby enemies when attacking | 0 = disable, 1 = enable");
 }
 
 void Settings::setConfigDefault(size_t index, const std::string& name, const std::type_info *type, const std::string& default_val, void *storage, const std::string& comment) {
@@ -416,4 +417,3 @@ std::string Settings::configValueToString(const std::type_info &type, void *stor
 
 	return stream.str();
 }
-

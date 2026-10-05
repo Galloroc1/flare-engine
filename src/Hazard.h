@@ -65,6 +65,18 @@ public:
 	int lifespan; // ticks down to zero
 	unsigned short direction;	// either a direction or option/random
 	int delay_frames;
+	int hit_count;
+	int max_targets;
+	float basic_true_hp_percent;
+	float basic_meteor_chance;
+	PowerID basic_meteor_power;
+	bool basic_meteor_lock_target;
+	float basic_execute_chance;
+	float basic_storm_chance;
+	PowerID basic_storm_power;
+	PowerID basic_storm_visual_power;
+	bool basic_meteor_rolled;
+	Entity* locked_target;
 	float angle; // in radians
 
 	StatBlock *src_stats;

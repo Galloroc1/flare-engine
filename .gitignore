@@ -46,6 +46,14 @@ gmon.out
 # os x
 .DS_Store
 
+# Python NPC bridge environment and build products
+/.venv/
+/.env
+/flare_ai.egg-info/
+/python/village_chief.log
+__pycache__/
+*.pyc
+
 # qt creator
 *.autosave
 

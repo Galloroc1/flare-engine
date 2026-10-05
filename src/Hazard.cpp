@@ -52,6 +52,18 @@ Hazard::Hazard(MapCollision *_collider)
 	, lifespan(1)
 	, direction(0)
 	, delay_frames(0)
+	, hit_count(0)
+	, max_targets(0)
+	, basic_true_hp_percent(0)
+	, basic_meteor_chance(0)
+	, basic_meteor_power(0)
+	, basic_meteor_lock_target(true)
+	, basic_execute_chance(0)
+	, basic_storm_chance(0)
+	, basic_storm_power(0)
+	, basic_storm_visual_power(0)
+	, basic_meteor_rolled(false)
+	, locked_target(NULL)
 	, angle(0)
 	, src_stats(NULL)
 	, power(NULL)
@@ -89,6 +101,18 @@ Hazard& Hazard::operator=(const Hazard& other) {
 	lifespan = other.lifespan;
 	direction = other.direction;
 	delay_frames = other.delay_frames;
+	hit_count = other.hit_count;
+	max_targets = other.max_targets;
+	basic_true_hp_percent = other.basic_true_hp_percent;
+	basic_meteor_chance = other.basic_meteor_chance;
+	basic_meteor_power = other.basic_meteor_power;
+	basic_meteor_lock_target = other.basic_meteor_lock_target;
+	basic_execute_chance = other.basic_execute_chance;
+	basic_storm_chance = other.basic_storm_chance;
+	basic_storm_power = other.basic_storm_power;
+	basic_storm_visual_power = other.basic_storm_visual_power;
+	basic_meteor_rolled = other.basic_meteor_rolled;
+	locked_target = other.locked_target;
 	angle = other.angle;
 
 	src_stats = other.src_stats;

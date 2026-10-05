@@ -258,6 +258,17 @@ void GameSlotPreview::loadGraphicsFromInventory(MenuInventory* menu_inv) {
 		}
 	}
 
+	// Complete character sprites can carry a special weapon even with armor layers hidden.
+	if (items && menu_inv) {
+		for (int i = 0; i < menu_inv->inventory[MenuInventory::EQUIPMENT].getSlotNumber(); ++i) {
+			ItemID id = menu_inv->inventory[MenuInventory::EQUIPMENT][i].item;
+			if (!menu_inv->isEquipSlotActive(i) || !items->isValid(id) || items->items[id]->gfx_hero.empty())
+				continue;
+			for (size_t layer = 0; layer < layer_reference_order.size() && layer < preview_gfx.size(); ++layer)
+				if (layer_reference_order[layer] == "main")
+					preview_gfx[layer] = items->items[id]->gfx_hero;
+		}
+	}
 	loadGraphics(preview_gfx);
 }
 

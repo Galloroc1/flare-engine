@@ -357,8 +357,8 @@ void GameStatePlay::checkTeleport() {
 
 			// store this as the new respawn point (provided the tile is open)
 			if (mapr->collider.isValidPosition(pc->stats.pos.x, pc->stats.pos.y, MapCollision::MOVE_NORMAL, MapCollision::COLLIDE_TYPE_HERO)) {
-				mapr->respawn_map = teleport_mapname;
-				mapr->respawn_point = pc->stats.pos;
+				mapr->respawn_map = mapr->respawn_override_map.empty() ? teleport_mapname : mapr->respawn_override_map;
+				mapr->respawn_point = mapr->respawn_override_map.empty() ? pc->stats.pos : mapr->respawn_override_point;
 			}
 			else {
 				Utils::logError("GameStatePlay: Spawn position (%d, %d) is blocked.", static_cast<int>(pc->stats.pos.x), static_cast<int>(pc->stats.pos.y));
@@ -1153,4 +1153,3 @@ GameStatePlay::~GameStatePlay() {
 	fow = NULL;
 	xp_scaling = NULL;
 }
-

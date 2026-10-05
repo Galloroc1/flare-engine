@@ -316,6 +316,7 @@ void LootManager::checkMapForLoot() {
 }
 
 void LootManager::addEnemyLoot(StatBlock *e) {
+	if (e) camp->notifyVillageKill(*e);
 	enemiesDroppingLoot.push_back(e);
 }
 

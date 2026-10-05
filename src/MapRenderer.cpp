@@ -54,6 +54,7 @@ FLARE.  If not, see http://www.gnu.org/licenses/
 #include "UtilsFileSystem.h"
 #include "UtilsMath.h"
 #include "WidgetTooltip.h"
+#include "WidgetButton.h"
 
 #include <stdint.h>
 #include <limits>
@@ -62,6 +63,7 @@ FLARE.  If not, see http://www.gnu.org/licenses/
 MapRenderer::MapRenderer()
 	: Map()
 	, tip(new WidgetTooltip())
+	, event_ui_button(new WidgetButton(WidgetButton::DEFAULT_FILE))
 	, tip_pos()
 	, show_tooltip(false)
 	, drawn_hero(false)
@@ -193,6 +195,7 @@ int MapRenderer::load(const std::string& fname) {
 	is_spawn_map = (fname == "maps/spawn.txt");
 
 	Map::load(fname);
+	camp->notifyVillageMap(fname);
 
 	loadMusic();
 
@@ -396,6 +399,12 @@ void MapRenderer::render(std::vector<Renderable> &r, std::vector<Renderable> &r_
 		std::sort(r.begin(), r.end(), priocompare);
 		std::sort(r_dead.begin(), r_dead.end(), priocompare);
 		renderIso(r, r_dead);
+	}
+
+	Event* ui_event = getActiveUIButton();
+	if (ui_event) {
+		updateUIButton(ui_event);
+		event_ui_button->render();
 	}
 }
 
@@ -1250,6 +1259,22 @@ void MapRenderer::checkHotspots() {
 
 	int interact_key = (settings->mouse_move && settings->mouse_move_swap) ? Input::MAIN2 : Input::MAIN1;
 
+	Event* ui_event = getActiveUIButton();
+	if (ui_event) {
+		updateUIButton(ui_event);
+		if (event_ui_button->checkClick()) {
+		if (eventm->executeEvent(*ui_event)) {
+				for (std::vector<Event>::iterator found = events.begin(); found != events.end(); ++found) {
+					if (&(*found) == ui_event) {
+						events.erase(found);
+						break;
+					}
+				}
+			}
+			return;
+		}
+	}
+
 	// work backwards through events because events can be erased in the loop.
 	// this prevents the iterator from becoming invalid.
 	std::vector<Event>::iterator it;
@@ -1260,7 +1285,7 @@ void MapRenderer::checkHotspots() {
 		if (!eventm->isActive(*it)) continue;
 
 		// skip events without hotspots
-		if (it->hotspot.h == 0) continue;
+		if (it->hotspot.h == 0 || it->ui_button) continue;
 
 		// skip events on cooldown
 		if (!it->cooldown.isEnd() || !it->delay.isEnd()) continue;
@@ -1373,6 +1398,21 @@ void MapRenderer::checkHotspots() {
 			}
 		}
 	}
+}
+
+Event* MapRenderer::getActiveUIButton() {
+	for (size_t i = 0; i < events.size(); ++i) {
+		if (events[i].ui_button && eventm->isActive(events[i]) && events[i].cooldown.isEnd() && events[i].delay.isEnd())
+			return &events[i];
+	}
+	return NULL;
+}
+
+void MapRenderer::updateUIButton(Event* event) {
+	EventComponent* label = event ? event->getComponent(EventComponent::TOOLTIP) : NULL;
+	event_ui_button->setLabel(label ? label->s : msg->get("Continue"));
+	event_ui_button->enabled = event != NULL;
+	event_ui_button->setPos(settings->view_w - event_ui_button->pos.w - 24, settings->view_h / 2 - event_ui_button->pos.h / 2);
 }
 
 void MapRenderer::checkNearestEvent() {
@@ -1772,6 +1812,7 @@ MapRenderer::~MapRenderer() {
 	clearEvents();
 	clearObjects();
 	delete tip;
+	delete event_ui_button;
 
 	/* unload sounds */
 	snd->reset();
@@ -1780,4 +1821,3 @@ MapRenderer::~MapRenderer() {
 		sids.pop_back();
 	}
 }
-

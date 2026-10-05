@@ -597,6 +597,7 @@ bool StatBlock::isNPCStat(FileParser *infile) {
 	}
 	else if (infile->key == "direction") return true;
 	else if (infile->key == "talker") return true;
+	else if (infile->key == "ai_chat") return true;
 	else if (infile->key == "portrait") return true;
 	else if (infile->key == "vendor") return true;
 	else if (infile->key == "vendor_requires_status") return true;
@@ -875,7 +876,9 @@ void StatBlock::load(const std::string& filename) {
  * Reduce temphp first, then hp
  */
 void StatBlock::takeDamage(float dmg, bool crit, int source_type) {
+	const float village_previous_hp = hp;
 	hp -= effects.damageShields(dmg);
+	if (hero && (hp < village_previous_hp || hp <= 0)) camp->notifyVillageDamage();
 	if (hp <= 0) {
 		hp = 0;
 
@@ -1138,6 +1141,7 @@ void StatBlock::logic() {
 		else {
 			hp_regen_per_frame = get(Stats::HP_REGEN) / 60.f / settings->max_frames_per_sec;
 		}
+		if (hero && hp_regen_per_frame < 0) camp->notifyVillageDamage();
 		hp += hp_regen_per_frame;
 		hp = std::max(0.0f, std::min(hp, get(Stats::HP_MAX)));
 	}
@@ -1660,4 +1664,3 @@ void StatBlock::checkGFXPaths() {
 		}
 	}
 }
-

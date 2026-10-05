@@ -104,6 +104,7 @@ public:
 		PRIMARY_STAT,
 		RESOURCE_STAT,
 		POWER_LEVEL,
+		ITEM_POWER,
 	};
 
 	bool is_multiplier;
@@ -288,6 +289,7 @@ public:
 	std::string sfx;           // the item sound when it hits the floor or inventory, etc
 	std::string sfx_craft;     // the item sound when crafted in the Vendor menu
 	std::string gfx;           // the sprite layer shown when this item is equipped
+	std::string gfx_hero;      // optional complete hero main-layer appearance
 	std::string power_desc;    // shows up in green text on the tooltip
 	std::string pickup_status; // when this item is picked up, set a campaign state (usually for quest items)
 	std::string stepfx;        // sound effect played when walking (armors only)

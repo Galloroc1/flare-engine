@@ -42,11 +42,13 @@ private:
 	void loadGraphics();
 	void updateEquipment(int slot);
 	void updateEquipmentSetWidgets();
+	void sellAllCarriedGear();
 
 	WidgetLabel label_inventory;
 	WidgetLabel label_currency;
 	WidgetButton *button_close;
 	WidgetButton *button_sort;
+	WidgetButton *button_sell_gear;
 
 	// equipment swap buttons
 	std::vector<WidgetButton*> equipmentSetButton;
@@ -172,4 +174,3 @@ public:
 };
 
 #endif
-

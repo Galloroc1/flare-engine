@@ -133,6 +133,14 @@ void WidgetScrollBox::scrollToTop() {
 	scrollTo(0);
 }
 
+void WidgetScrollBox::scrollToBottom() {
+	scrollTo(contents_size.y - pos.h);
+}
+
+int WidgetScrollBox::getScrollOffset() const {
+	return static_cast<int>(cursor);
+}
+
 Point WidgetScrollBox::input_assist(const Point& mouse) {
 	Point new_mouse;
 	if (Utils::isWithinRect(pos,mouse)) {

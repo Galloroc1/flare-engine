@@ -183,6 +183,8 @@ Map::Map()
 	, h(1)
 	, hero_pos_enabled(false)
 	, hero_pos()
+	, respawn_override_map("")
+	, respawn_override_point()
 	, background_color(0,0,0,0)
 	, fogofwar(eset->misc.fogofwar)
 	, save_fogofwar(eset->misc.save_fogofwar)
@@ -240,6 +242,8 @@ int Map::load(const std::string& fname, bool load_procgen_cache) {
 	hero_pos_enabled = false;
 	hero_pos.x = 0;
 	hero_pos.y = 0;
+	respawn_override_map.clear();
+	respawn_override_point = FPoint();
 
 	Utils::logInfo("Map: Loading map '%s'", fname.c_str());
 
@@ -430,6 +434,12 @@ void Map::loadHeader(FileParser &infile) {
 		hero_pos.x = static_cast<float>(Parse::popFirstInt(infile.val)) + 0.5f;
 		hero_pos.y = static_cast<float>(Parse::popFirstInt(infile.val)) + 0.5f;
 		hero_pos_enabled = true;
+	}
+	else if (infile.key == "respawn") {
+		// @ATTR respawn|filename, int, int : Map, X, Y|Override the death respawn point for this map.
+		respawn_override_map = Parse::popFirstString(infile.val);
+		respawn_override_point.x = static_cast<float>(Parse::popFirstInt(infile.val)) + 0.5f;
+		respawn_override_point.y = static_cast<float>(Parse::popFirstInt(infile.val)) + 0.5f;
 	}
 	else if (infile.key == "parallax_layers") {
 		// @ATTR parallax_layers|filename|Filename of a parallax layers definition.
@@ -1644,4 +1654,3 @@ std::string Map::getFOWFilename() {
 bool Chunk::isStraight() {
 	return ((links[LINK_NORTH] && links[LINK_SOUTH] && !links[LINK_WEST] && !links[LINK_EAST]) || (!links[LINK_NORTH] && !links[LINK_SOUTH] && links[LINK_WEST] && links[LINK_EAST]));
 }
-

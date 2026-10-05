@@ -55,6 +55,8 @@ public:
 	bool getPrev();
 	void activate();
 	void scrollToTop();
+	void scrollToBottom();
+	int getScrollOffset() const;
 
 private:
 	static const int SCROLL_SPEED_COARSE_MOD = 4;
@@ -76,4 +78,3 @@ private:
 };
 
 #endif
-

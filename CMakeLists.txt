@@ -116,6 +116,7 @@ EndIf (NOT SDL2TTF_FOUND)
 # Sources
 
 Set (FLARE_SOURCES
+	./src/AIChatBridge.cpp
 	./src/Animation.cpp
 	./src/AnimationMedia.cpp
 	./src/AnimationManager.cpp

@@ -33,6 +33,7 @@ FLARE.  If not, see http://www.gnu.org/licenses/
 #include "EngineSettings.h"
 #include "Entity.h"
 #include "EntityBehavior.h"
+#include "EntityManager.h"
 #include "Hazard.h"
 #include "HazardManager.h"
 #include "InputState.h"
@@ -48,6 +49,19 @@ FLARE.  If not, see http://www.gnu.org/licenses/
 #include "UtilsMath.h"
 
 #include <cassert>
+
+// Queue targeting belongs to each new hazard, rather than mutating shared power data.
+static void queueBasicMeteor(PowerID id, StatBlock* source, Entity* target, bool lock_target) {
+	const size_t first = powers->hazards.size();
+	powers->activate(id, source, target->stats.pos, target->stats.pos);
+	if (!lock_target) return;
+	const size_t count = powers->hazards.size();
+	for (size_t i = 0; i < count; ++i) {
+		Hazard* created = powers->hazards.front(); powers->hazards.pop();
+		if (i >= first) created->locked_target = target;
+		powers->hazards.push(created);
+	}
+}
 
 Entity::Entity()
 	: sprites(NULL)
@@ -317,6 +331,7 @@ bool Entity::move() {
  * Returns false on miss
  */
 bool Entity::takeHit(Hazard &h) {
+	if (h.locked_target && h.locked_target != this) return false;
 	//check if this enemy should be affected by this hazard based on the category
 	if(!h.power->target_categories.empty()) {
 		//the power has a target category requirement, so if it doesnt match, dont continue
@@ -405,7 +420,7 @@ bool Entity::takeHit(Hazard &h) {
 	true_avoidance = std::min(std::max(true_avoidance, eset->combat.min_avoidance), eset->combat.max_avoidance);
 
 	bool missed = false;
-	if (!h.src_stats->perfect_accuracy && Math::percentChanceF(true_avoidance)) {
+	if (h.power->damage_current_hp_percent <= 0 && !h.src_stats->perfect_accuracy && Math::percentChanceF(true_avoidance)) {
 		missed = true;
 	}
 
@@ -428,6 +443,8 @@ bool Entity::takeHit(Hazard &h) {
 		dmg += stats.applyResistToDamage(i, dmg_part);
 	}
 
+	if (h.power->damage_current_hp_percent > 0 && h.power->base_damage < h.damage.size())
+		dmg = stats.applyResistToDamage(h.power->base_damage, stats.hp * h.power->damage_current_hp_percent / 100.0f);
 	float absorption = 0;
 	if (!h.power->trait_armor_penetration) { // armor penetration ignores all absorption
 		// subtract absorption from armor
@@ -493,7 +510,7 @@ bool Entity::takeHit(Hazard &h) {
 			inpt->joystickRumble(InputState::JOYSTICK_RUMBLE_STRENGTH, InputState::JOYSTICK_RUMBLE_STRENGTH, 500);
 		}
 	}
-	else if (is_overhit) {
+	else if (is_overhit && h.power->damage_current_hp_percent <= 0) {
 		dmg = (dmg * Math::randBetweenF(eset->combat.min_overhit_damage, eset->combat.max_overhit_damage)) / 100;
 		// Should we use shakycam for overhits?
 	}
@@ -503,6 +520,17 @@ bool Entity::takeHit(Hazard &h) {
 		dmg = (dmg * Math::randBetweenF(eset->combat.min_miss_damage, eset->combat.max_miss_damage)) / 100;
 	}
 
+	const bool basic_weapon_hit = !missed && h.source_type == Power::SOURCE_TYPE_HERO &&
+		h.src_stats->hero && !stats.hero && !stats.hero_ally;
+	// All random basic-attack procs roll once, on the first successful target hit.
+	const bool roll_basic_procs = basic_weapon_hit && !h.basic_meteor_rolled;
+	if (roll_basic_procs) h.basic_meteor_rolled = true;
+	const bool execute = roll_basic_procs && h.basic_execute_chance > 0 && Math::percentChanceF(h.basic_execute_chance);
+	// This component is added after armor, resistances, criticals and misses,
+	// using HP before the normal hit. Ordinary damage shields still absorb hits.
+	if (basic_weapon_hit && h.basic_true_hp_percent > 0)
+		dmg += stats.hp * h.basic_true_hp_percent / 100.0f;
+	if (execute) dmg = std::max(dmg, stats.hp);
 	dmg = eset->combat.resourceRound(dmg);
 
 	if (!h.power->ignore_zero_damage) {
@@ -529,7 +557,36 @@ bool Entity::takeHit(Hazard &h) {
 	bool was_debuffed = stats.effects.isDebuffed();
 
 	// apply damage
+	// Execution uses the ordinary death/reward pipeline, including bosses and shields.
+	if (execute) stats.hp = 0;
 	stats.takeDamage(dmg, crit, h.source_type);
+	// A piercing arrow rolls once on its first successful hit; the meteor cannot
+	// trigger another meteor or apply the bow's basic-attack true damage.
+	if (roll_basic_procs && h.basic_meteor_power > 0 && Math::percentChanceF(h.basic_meteor_chance))
+		queueBasicMeteor(h.basic_meteor_power, h.src_stats, this, h.basic_meteor_lock_target);
+	if (roll_basic_procs && h.basic_storm_power > 0 && Math::percentChanceF(h.basic_storm_chance) && entitym && mapr) {
+		// A bounded grid fills the viewport even when only a few enemies remain.
+		// These decorative meteors never deal damage; targeted meteors below do.
+		if (powers->isValid(h.basic_storm_visual_power)) {
+			for (int row = 0; row < 4; ++row) {
+				for (int col = 0; col < 4; ++col) {
+					FPoint target = Utils::screenToMap((2 * col + 1) * settings->view_w / 8,
+						(2 * row + 1) * settings->view_h / 8, mapr->cam.shake.x, mapr->cam.shake.y);
+					if (!mapr->collider.isOutsideMap(target.x, target.y))
+						powers->activate(h.basic_storm_visual_power, h.src_stats, target, target);
+				}
+			}
+		}
+		// Rain on every living hostile currently in the viewport. One locked meteor
+		// per enemy keeps dense packs from taking N-squared overlapping damage.
+		for (size_t i = 0; i < entitym->entities.size(); ++i) {
+			Entity* enemy = entitym->entities[i];
+			if (!enemy || enemy->stats.hp <= 0 || enemy->stats.hero || enemy->stats.hero_ally) continue;
+			Point screen = Utils::mapToScreen(enemy->stats.pos.x, enemy->stats.pos.y, mapr->cam.shake.x, mapr->cam.shake.y);
+			if (screen.x < 0 || screen.y < 0 || screen.x >= settings->view_w || screen.y >= settings->view_h) continue;
+			queueBasicMeteor(h.basic_storm_power, h.src_stats, enemy, true);
+		}
+	}
 
 	// after effects
 	if (dmg > 0 || h.power->ignore_zero_damage) {
@@ -1038,4 +1095,3 @@ Entity::~Entity () {
 	delete activeAnimation;
 	delete behavior;
 }
-

@@ -68,6 +68,7 @@ Event::Event()
 	, cooldown()
 	, delay()
 	, keep_after_trigger(true)
+	, ui_button(false)
 	, center(FPoint(-1, -1))
 	, reachable_from(Rect()) {
 }
@@ -173,6 +174,10 @@ void EventManager::loadEvent(FileParser &infile, Event* evnt) {
 
 		evnt->center.x = static_cast<float>(evnt->hotspot.x) + static_cast<float>(evnt->hotspot.w)/2;
 		evnt->center.y = static_cast<float>(evnt->hotspot.y) + static_cast<float>(evnt->hotspot.h)/2;
+	}
+	else if (infile.key == "ui_button") {
+		// @ATTR event.ui_button|bool|Show this event as a fixed-screen action button on the right side of the HUD.
+		evnt->ui_button = Parse::toBool(infile.val);
 	}
 	else if (infile.key == "cooldown") {
 		// @ATTR event.cooldown|duration|Duration for event cooldown in 'ms' or 's'.
@@ -978,6 +983,14 @@ bool EventManager::executeEventInternal(Event &ev, bool skip_delay) {
 		ec = &ev.components[i];
 
 		if (ec->type == EventComponent::SET_STATUS) {
+			if (ec->s == "dnf_normal" || ec->s == "dnf_veteran" || ec->s == "dnf_champion")
+				camp->notifyVillageTrialStart();
+			if (!camp->checkStatus(ec->status)) {
+				if (ec->s == "dnf_room_1_clear") camp->notifyVillageTrialStage(1);
+				else if (ec->s == "dnf_room_2_clear") camp->notifyVillageTrialStage(2);
+				else if (ec->s == "dnf_room_3_clear") camp->notifyVillageTrialStage(3);
+			}
+			if (ec->s == "dnf_room_3_clear" && !camp->checkStatus(ec->status)) camp->notifyVillageTrial();
 			camp->setStatus(ec->status);
 		}
 		else if (ec->type == EventComponent::UNSET_STATUS) {

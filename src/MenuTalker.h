@@ -34,6 +34,8 @@ class StatBlock;
 class WidgetButton;
 class WidgetLabel;
 class WidgetScrollBox;
+class WidgetInput;
+class AIChatBridge;
 
 class MenuTalker : public Menu {
 private:
@@ -57,6 +59,10 @@ private:
 	void nextDialog();
 	void setupTabList();
 	void addAction(const std::string& label, int node_id, bool is_vendor);
+	void logicAI();
+	void refreshAIBuffer();
+	void submitAIQuestion();
+	void setAIChatLayout(bool enabled);
 
 	Sprite *portrait;
 	std::string hero_name;
@@ -71,12 +77,33 @@ private:
 	Point text_offset;
 	Rect portrait_he;
 	Rect portrait_you;
+	Rect default_window_area;
+	Rect default_dialog_pos;
+	Rect default_text_pos;
+	Point default_text_offset;
+	Rect default_portrait_he;
+	Rect default_portrait_you;
+	Point default_close_pos;
+	Point default_advance_pos;
+	int default_alignment;
+	bool ai_chat_layout;
 
 	std::string font_who;
 	std::string font_dialog;
 
 	WidgetLabel *label_name;
 	WidgetScrollBox *textbox;
+	WidgetInput *ai_input;
+	WidgetButton *ai_send;
+	std::vector<WidgetButton*> ai_quest_buttons;
+	std::vector<std::string> ai_quest_ids, ai_quest_operations;
+	void refreshQuestControls();
+	AIChatBridge *ai_bridge;
+	std::string ai_text;
+	bool ai_waiting;
+	bool ai_thinking;
+	size_t ai_answer_chunks;
+	size_t ai_answer_bytes;
 
 	std::vector<Action> actions;
 

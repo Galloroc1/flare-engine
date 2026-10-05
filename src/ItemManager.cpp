@@ -359,6 +359,7 @@ Item::Item()
 	, sfx("")
 	, sfx_craft("")
 	, gfx("")
+	, gfx_hero("")
 	, power_desc("")
 	, pickup_status("")
 	, stepfx("")
@@ -642,6 +643,9 @@ void ItemManager::loadItems(const std::string& filename) {
 		else if (infile.key == "gfx")
 			// @ATTR gfx|filename|Filename of an animation set to display when the item is equipped.
 			item->gfx = infile.val;
+		else if (infile.key == "gfx_hero")
+			// @ATTR gfx_hero|filename|Optional complete main-layer avatar animation when equipped.
+			item->gfx_hero = infile.val;
 		else if (infile.key == "loot_animation") {
 			// @ATTR loot_animation|repeatable(filename, int, int) : Loot image, Min quantity, Max quantity|Specifies the loot animation file for the item. The max quantity, or both quantity values, may be omitted.
 			if (clear_loot_anim) {
@@ -1142,6 +1146,15 @@ void ItemManager::loadSets(const std::string& filename) {
 			parseBonus(bonus, infile);
 			item_set->bonus.push_back(bonus);
 		}
+		else if (infile.key == "bonus_power") {
+			// @ATTR bonus_power|repeatable(int, power_id)|Grants an equipped passive at the required set count.
+			if (clear_bonus) { item_set->bonus.clear(); clear_bonus = false; }
+			SetBonusData bonus;
+			bonus.type = BonusData::ITEM_POWER;
+			bonus.requirement = Parse::popFirstInt(infile.val);
+			bonus.power_id = Parse::toPowerID(infile.val);
+			item_set->bonus.push_back(bonus);
+		}
 		else if (infile.key == "bonus_power_level") {
 			// @ATTR bonus_power_level|repeatable(int, power_id, list(level_scaled_value)) : Required set item count, Base power, Bonus levels|Grants bonus levels to a given base power.
 			SetBonusData bonus;
@@ -1288,6 +1301,11 @@ void ItemManager::parseBonus(BonusData& bdata, FileParser& infile) {
 }
 
 void ItemManager::getBonusString(std::stringstream& ss, BonusData* bdata) {
+	if (bdata->type == BonusData::ITEM_POWER) {
+		if (powers && powers->isValid(bdata->power_id))
+			ss << powers->powers[bdata->power_id]->description;
+		return;
+	}
 	float scaled_bdata_value = bdata->value.get();
 
 	// power level bonuses can only be whole integers

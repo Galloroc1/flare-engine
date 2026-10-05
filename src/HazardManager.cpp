@@ -174,8 +174,9 @@ void HazardManager::logic() {
 
 void HazardManager::hitEntity(size_t index, const bool hit) {
 	if (!hit) return;
+	++h[index]->hit_count;
 
-	if (!h[index]->power->multitarget) {
+	if (!h[index]->power->multitarget || (h[index]->max_targets > 0 && h[index]->hit_count >= h[index]->max_targets)) {
 		h[index]->active = false;
 		if (!h[index]->power->complete_animation) h[index]->lifespan = 0;
 	}

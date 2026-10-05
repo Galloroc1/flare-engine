@@ -281,6 +281,8 @@ public:
 	unsigned short h;
 	bool hero_pos_enabled;
 	FPoint hero_pos;
+	std::string respawn_override_map;
+	FPoint respawn_override_point;
 	std::string parallax_filename;
 	Color background_color;
 	unsigned short fogofwar;

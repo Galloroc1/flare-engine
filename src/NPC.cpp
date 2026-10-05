@@ -53,6 +53,7 @@ NPC::NPC(const Entity& e)
 	, npc_portrait(NULL)
 	, hero_portrait(NULL)
 	, talker(false)
+	, ai_chat(false)
 	, vendor(false)
 	, reset_buyback(true)
 	, stock()
@@ -222,6 +223,10 @@ bool NPC::load(const std::string& npc_id) {
 				else if (infile.key == "talker") {
 					// @ATTR npc.talker|bool|Allows this NPC to be talked to.
 					talker = Parse::toBool(infile.val);
+				}
+				else if (infile.key == "ai_chat") {
+					// @ATTR npc.ai_chat|bool|Use the streaming Python dialogue bridge.
+					ai_chat = Parse::toBool(infile.val);
 				}
 				else if (infile.key == "portrait") {
 					// @ATTR npc.portrait|filename|Filename of the default portrait image.

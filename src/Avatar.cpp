@@ -163,6 +163,7 @@ void Avatar::init() {
 	}
 	current_power = 0;
 	current_power_original = 0;
+	current_power_is_auto_attack = false;
 	newLevelNotification = false;
 
 	stats.hero = true;
@@ -618,6 +619,26 @@ void Avatar::logic() {
 	}
 
 	if (!stats.effects.stun) {
+		// A manually requested skill takes priority over an automatic basic attack.
+		// Cancel only the auto-attack animation; manually started powers remain untouched.
+		bool manual_power_requested = false;
+		for (size_t i = 0; i < action_queue.size(); ++i) {
+			if (!action_queue[i].auto_attack && !action_queue[i].activated_from_inventory && action_queue[i].power > 0) {
+				manual_power_requested = true;
+				break;
+			}
+		}
+		if (current_power_is_auto_attack && manual_power_requested) {
+			if (current_power < power_cast_timers.size() && power_cast_timers[current_power])
+				power_cast_timers[current_power]->reset(Timer::END);
+			if (current_power_original < power_cast_timers.size() && power_cast_timers[current_power_original])
+				power_cast_timers[current_power_original]->reset(Timer::END);
+			stats.cur_state = StatBlock::ENTITY_STANCE;
+			stats.cooldown.reset(Timer::END);
+			stats.prevent_interrupt = false;
+			current_power_is_auto_attack = false;
+		}
+
 		bool allowed_to_move;
 		bool allowed_to_turn;
 
@@ -644,6 +665,7 @@ void Avatar::logic() {
 				if (power->type == Power::TYPE_BLOCK) {
 					current_power = replaced_id;
 					current_power_original = action.power;
+					current_power_is_auto_attack = action.auto_attack;
 					act_target = action.target;
 					attack_anim = power->attack_anim;
 
@@ -657,6 +679,7 @@ void Avatar::logic() {
 				// this power has an animation, so prepare to switch to it
 				current_power = replaced_id;
 				current_power_original = action.power;
+				current_power_is_auto_attack = action.auto_attack;
 				act_target = action.target;
 				attack_anim = power->attack_anim;
 				resetActiveAnimation();
@@ -817,6 +840,7 @@ void Avatar::logic() {
 					stats.cur_state = StatBlock::ENTITY_STANCE;
 					stats.cooldown.reset(Timer::BEGIN);
 					stats.prevent_interrupt = false;
+					current_power_is_auto_attack = false;
 				}
 
 				break;
@@ -1178,6 +1202,7 @@ bool Avatar::isLowHpCursorEnabled() {
 std::string Avatar::getGfxFromType(const std::string& gfx_type) {
 	feet_index = -1;
 	std::string gfx;
+	std::string hero_gfx;
 
 	if (menu && menu->inv) {
 		MenuItemStorage& equipment = menu->inv->inventory[MenuInventory::EQUIPMENT];
@@ -1187,6 +1212,8 @@ std::string Avatar::getGfxFromType(const std::string& gfx_type) {
 				continue;
 
 			ItemType& equip_item_type = items->getItemType(equipment.slot_type[i]);
+			if (gfx_type == "main" && items->isValid(equipment[i].item) && !items->items[equipment[i].item]->gfx_hero.empty())
+				hero_gfx = items->items[equipment[i].item]->gfx_hero;
 
 			if (items->isValid(equipment[i].item) && gfx_type == equip_item_type.id) {
 				gfx = items->items[equipment[i].item]->gfx;
@@ -1198,6 +1225,9 @@ std::string Avatar::getGfxFromType(const std::string& gfx_type) {
 	}
 
 	// special case: if we don't have a head, use the portrait's head
+	if (!hero_gfx.empty())
+		return hero_gfx;
+
 	if (gfx.empty() && gfx_type == "head") {
 		gfx = stats.gfx_head;
 	}

@@ -40,11 +40,13 @@ FLARE.  If not, see http://www.gnu.org/licenses/
 class FileParser;
 class Sprite;
 class WidgetTooltip;
+class WidgetButton;
 
 class MapRenderer : public Map {
 private:
 
 	WidgetTooltip *tip;
+	WidgetButton *event_ui_button;
 	TooltipData tip_buf;
 	Point tip_pos;
 	bool show_tooltip;
@@ -75,6 +77,8 @@ private:
 	void clearLayers();
 
 	void createTooltip(EventComponent *ec);
+	Event* getActiveUIButton();
+	void updateUIButton(Event* event);
 
 	void getTileBounds(const int_fast16_t x, const int_fast16_t y, const Map_Layer& layerdata, Rect& bounds, Point& center);
 

@@ -1,0 +1,8 @@
+[model]
+model_name = "deepseek-v4.1-flash"
+provider = "vllm"
+base_url = "https://maas.qianwenaiapi.com/compatible-mode/v1"
+api_key_env = "ALI_API_KEY"
+gather_think = true
+reasoning_history_format = "inline"
+thinking_mode = "omit"
